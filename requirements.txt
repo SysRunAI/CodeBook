@@ -1,0 +1,14 @@
+joblib
+matplotlib
+moviepy
+numpy
+pandas
+pycryptodome
+python-dotenv
+Requests
+safetensors
+seaborn
+torch
+torchvision
+tqdm
+wandb

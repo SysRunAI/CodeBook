@@ -20,6 +20,7 @@ This project was developed to code and train models faster. The code is clean an
 ## TODO:
 [] Adding schedulers support
 [] Refactoring
+[] Multi-GPU support
 
 ## Example:
 

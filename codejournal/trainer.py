@@ -5,6 +5,7 @@ from .imports import *
 from dataclasses import dataclass, field
 import torch.optim as optim
 from torch.amp import GradScaler, autocast
+from typing import Union
 
 log_format = f'\n{"*"*25}\n%(asctime)s %(levelname)s:\n\n %(message)s\n{"*"*25}\n'
 logging.basicConfig(format=log_format, level=logging.INFO)
@@ -25,7 +26,7 @@ class TrainerArgs(ConfigBase):
     scheduler: str = None
     scheduler_kwargs: dict = field(default_factory=dict)
     grad_accumulation_steps: int = 1
-    grad_clip_norm: float | bool = 1.0  # False for no clipping
+    grad_clip_norm: Union[float, bool] = 1.0  # False for no clipping
     mixed_precision: bool = True
 
     # Training settings
@@ -45,7 +46,7 @@ class TrainerArgs(ConfigBase):
     checkpoint_metric: str = "loss"
     checkpoint_metric_type: str = "val"
     checkpoint_metric_minimize: bool = True
-    resume_from_checkpoint: str | bool = None  # None for no resuming, True for latest checkpoint, or path to checkpoint
+    resume_from_checkpoint: Union[str, bool] = None  # None for no resuming, True for latest checkpoint, or path to checkpoint
 
     # Logging settings
     log_every_n_steps: int = 32

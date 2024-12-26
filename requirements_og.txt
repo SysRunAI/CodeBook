@@ -1,0 +1,14 @@
+joblib==1.4.2
+matplotlib==3.10.0
+moviepy==2.1.1
+numpy==2.2.1
+pandas==2.2.3
+pycryptodome==3.21.0
+python-dotenv==1.0.1
+Requests==2.32.3
+safetensors==0.4.5
+seaborn==0.13.2
+torch==2.5.1
+torchvision==0.20.1
+tqdm==4.67.1
+wandb==0.19.1
