@@ -79,7 +79,48 @@ def untar_file(tar_path, extract_path="."):
 
 def parallel_map(func, data, max_workers=4):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        return list(executor.map(func, data))
+        results = list(tqdm(executor.map(func, data), total=len(data), desc="Processing"))
+    return results
+
+def convert_to_channel_first(tensor):
+    """
+    Converts a tensor from channel-last format to channel-first format.
+
+    Args:
+        tensor (torch.Tensor): Input tensor in channel-last format 
+            (e.g., [batch, height, width, channels]).
+
+    Returns:
+        torch.Tensor: Tensor in channel-first format 
+            (e.g., [batch, channels, height, width]).
+    """
+    if tensor.ndim < 3:
+        raise ValueError(f"Tensor must have at least 3 dimensions, got {tensor.ndim}.")
+    ndim = tensor.ndim
+    dims = list(range(ndim))
+    batch, others, channels = dims[0], dims[1:-1], dims[-1]
+    return tensor.permute(batch, channels, *others)
+
+
+def convert_to_channel_last(tensor):
+    """
+    Converts a tensor from channel-first format to channel-last format.
+
+    Args:
+        tensor (torch.Tensor): Input tensor in channel-first format 
+            (e.g., [batch, channels, height, width]).
+
+    Returns:
+        torch.Tensor: Tensor in channel-last format 
+            (e.g., [batch, height, width, channels]).
+    """
+    if tensor.ndim < 3:
+        raise ValueError(f"Tensor must have at least 3 dimensions, got {tensor.ndim}.")
+    ndim = tensor.ndim
+    dims = list(range(ndim))
+    batch, channels, others = dims[0], dims[1], dims[2:]
+    return tensor.permute(batch, *others, channels)
+
 
 def clear_gpu_cache():
     gc.collect()

@@ -11,12 +11,21 @@ class ModelBase(nn.Module):
     def freeze(self):
         for param in self.parameters():
             param.requires_grad = False
+            
     def unfreeze(self):
         for param in self.parameters():
             param.requires_grad = True
+
+    def isfrozen(self):
+        for param in self.parameters():
+            if param.requires_grad:
+                return False
+        return True
+
     @property
     def device(self):
         return next(self.parameters()).device
+
     def to(self, device):
         return super().to(device)
     
