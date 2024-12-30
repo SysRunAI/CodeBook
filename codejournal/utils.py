@@ -131,6 +131,14 @@ def clear_gpu_cache():
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
 
+from dataclasses import make_dataclass
+
+def dict_to_dataclass_class(class_name: str, data):
+    # Convert the dictionary into field definitions
+    fields = [(key, type(value), None) for key, value in data.items()]
+    # Dynamically create and return the dataclass
+    return make_dataclass(class_name, fields)
+
 
 __all__ = [ "simple_timer",
             "conceal_stdout",

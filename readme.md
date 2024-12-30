@@ -25,13 +25,14 @@ This project was developed to code and train models faster. The code is clean an
 ## Example:
 
 ```python
-from codejournal.imports import * # All important imports, import at once
-from codejournal.modeling import * # All modeling tools: ConfigBase, Trainer, TrainerArgs, ModelBase
+from codejournal.imports import *
+from codejournal.modeling import *
 
 import torchvision.models as models
 from torchvision import datasets, transforms
 
-# os.envor["SLACK_WEBHOOK_URL"] = ""
+os.environ["HUGGINGFACE_TOKEN"] = "" # Put your HuggingFace token here
+os.environ["SLACK_WEBHOOK_URL"] = "" # Put your Slack webhook URL here
 
 class Config(ConfigBase):
     resnet: int = 18
@@ -41,9 +42,8 @@ class Config(ConfigBase):
 class ResNet(ModelBase):
     def __init__(self, config):
         super().__init__(config)
-        self.config = config
-        self.model = getattr(models, f'resnet{config.resnet}')(pretrained=config.pretrained)
-        self.model.fc = nn.Linear(self.model.fc.in_features, config.num_classes)
+        self.model = getattr(models, f'resnet{self.config.resnet}')(pretrained=self.config.pretrained)
+        self.model.fc = nn.Linear(self.model.fc.in_features, self.config.num_classes)
         
     def forward(self, x):
         x = x.repeat(1,3,1,1)
@@ -64,10 +64,15 @@ class ResNet(ModelBase):
         preds = torch.argmax(y_hat, dim=1)
         acc = torch.sum(preds == y).item() / y.size(0)
         return {'loss': loss, 'acc': acc}
+    
+    def get_optimizer(self, trainer):
+        # Override the default optimizer if needed
+        return super().get_optimizer(trainer)
+    
+    def get_scheduler(self, optimizer, trainer):
+        args = trainer.args # For configuring÷
+        return super().get_scheduler(optimizer, trainer)
 
-
-config = Config()
-model = ResNet(config)
 
 transform=transforms.Compose([
         transforms.ToTensor(),
@@ -82,9 +87,9 @@ val_dataset = datasets.MNIST('./data', train=False, download=True,
 training_args = TrainerArgs(
     # Core Training Configuration
     batch_size=32,
-    max_epochs=11,
-    train_steps_per_epoch=1000,
-    val_steps_per_epoch=500,
+    max_epochs=5,
+    train_steps_per_epoch=800,
+    val_steps_per_epoch=400,
     grad_accumulation_steps=1,
     lr=1e-5,
     optimizer="AdamW",
@@ -122,12 +127,16 @@ training_args = TrainerArgs(
     # Miscellaneous
     safe_dataloader=True,
     log_grad_norm=True,
-    slack_notify=True,
+    slack_notify=True if os.environ.get("SLACK_WEBHOOK_URL") else False,
     results_dir="results",
     val_data_shuffle=False,
 )
 
+config = Config()
+model = ResNet(config)
 
 trainer = Trainer(training_args)
 trainer.train(model, train_dataset, val_dataset)
+if os.environ.get("HUGGINGFACE_TOKEN"):
+    model.push_to_hub("demo-resnet")
 ```

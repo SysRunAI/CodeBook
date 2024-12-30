@@ -6,10 +6,10 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name="codejournal",
-    version="0.1.1",
-    author="Your Name",
-    author_email="your_email@example.com",
-    description="A Python package code snip package for faster pytorch-AI development",
+    version="0.1.2",
+    author="Siva Sankar S",
+    author_email="sysrunai@gmail.com",
+    description="A Python package code snips package for faster pytorch-AI development",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/codejournal",

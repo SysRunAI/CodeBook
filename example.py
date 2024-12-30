@@ -4,7 +4,8 @@ from codejournal.modeling import *
 import torchvision.models as models
 from torchvision import datasets, transforms
 
-# os.envor["SLACK_WEBHOOK_URL"] = ""
+os.environ["HUGGINGFACE_TOKEN"] = "" # Put your HuggingFace token here
+os.environ["SLACK_WEBHOOK_URL"] = "" # Put your Slack webhook URL here
 
 class Config(ConfigBase):
     resnet: int = 18
@@ -59,9 +60,9 @@ val_dataset = datasets.MNIST('./data', train=False, download=True,
 training_args = TrainerArgs(
     # Core Training Configuration
     batch_size=32,
-    max_epochs=11,
-    train_steps_per_epoch=1000,
-    val_steps_per_epoch=500,
+    max_epochs=5,
+    train_steps_per_epoch=800,
+    val_steps_per_epoch=400,
     grad_accumulation_steps=1,
     lr=1e-5,
     optimizer="AdamW",
@@ -94,12 +95,12 @@ training_args = TrainerArgs(
 
     # Resume and Debugging
     resume_from_checkpoint=True,  # None for no resuming, True for resuming latest checkpoint, or path to checkpoint
-    debug_mode=True,
+    debug_mode=False,
 
     # Miscellaneous
     safe_dataloader=True,
     log_grad_norm=True,
-    slack_notify=True,
+    slack_notify=True if os.environ.get("SLACK_WEBHOOK_URL") else False,
     results_dir="results",
     val_data_shuffle=False,
 )
@@ -110,5 +111,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(training_args)
     trainer.train(model, train_dataset, val_dataset)
+    if os.environ.get("HUGGINGFACE_TOKEN"):
+        model.push_to_hub("demo-resnet")
 
 __all__ = ["Config","ResNet","Trainer","TrainerArgs","train_dataset","val_dataset","training_args"]

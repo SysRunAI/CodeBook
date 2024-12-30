@@ -13,3 +13,4 @@ torchvision
 tqdm
 wandb
 python-opencv
+huggingface-hub

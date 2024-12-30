@@ -6,6 +6,9 @@ __pycache__/
 *.ipynb
 data/
 testing/
+temp/
+wandb/
+results/
 
 # C extensions
 *.so

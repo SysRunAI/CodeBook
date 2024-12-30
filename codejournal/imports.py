@@ -59,4 +59,7 @@ logger.info(f"CUDA devices: {torch.cuda.device_count()}")
 
 # environ check
 if not os.environ.get("SLACK_WEBHOOK_URL"):
-    logger.warning("Slack webhook URL not found. Slack notifications will not be sent.")
+    logger.warning("Slack webhook URL (SLACK_WEBHOOK_URL) not found. Slack notifications will not be sent.")
+
+if not os.environ.get("HUGGINGFACE_TOKEN"):
+    logger.warning("HuggingFace token (HUGGINGFACE_TOKEN) not found. Pushing to the Hub will not be possible.")

@@ -214,15 +214,17 @@ class Trainer:
                     self.load_checkpoint(model, path)
                     self.notify(f"Resuming from latest checkpoint: {path}")
         return train_dataloader, optimizer, scheduler, grad_scaler
-        
+
     def print_model_summary(self,model):
+        from .modeling import ModelUtils
         data = []
+        
         for name, instance in model.named_children():
             data.append({"Module":instance.__class__.__name__,
-                    "parameter_count(m)":instance.parameter_count/1e6,
-                    "trainable_parameter_count(m)":instance.trainable_parameter_count/1e6,
-                    "trainable": not instance.isfrozen()})
-            data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * instance.dtype.itemsize/1024/1024
+                    "parameter_count(m)":ModelUtils.get_parameter_count(instance) / 1e6,
+                    "trainable_parameter_count(m)":ModelUtils.get_trainable_parameter_count(instance)/1e6,
+                    "trainable": not ModelUtils.is_module_frozen(instance)})
+            data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * ModelUtils.get_dtype(instance).itemsize/1024/1024
 
         data.append({
             "Module": model.__class__.__name__ + " (Total)",
@@ -230,7 +232,7 @@ class Trainer:
             "trainable_parameter_count(m)": model.trainable_parameter_count/1e6,
             "trainable": not model.isfrozen()
         })
-        data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * instance.dtype.itemsize/1024/1024
+        data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * model.get_dtype().itemsize/1024/1024
 
         table = pd.DataFrame(data).round(2).to_markdown(index=False)
         s = f"\n{'-'*10} Model Summary {'-'*10}\n{table}\n{'-'*35}"

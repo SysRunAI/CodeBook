@@ -1,69 +1,136 @@
 from .imports import *
 from .config import ConfigBase
 from .trainer import Trainer, TrainerArgs
+from huggingface_hub import HfApi
+    
+class ModelUtils:
+    """Utility functions for model-related operations."""
 
-
-class ModelBase(nn.Module):
-    def __init__(self,config):
-        super().__init__()
-        self.config = config
-        
-    def freeze(self):
-        for param in self.parameters():
+    @staticmethod
+    def freeze_parameters(module):
+        """Freeze all parameters of a module."""
+        for param in module.parameters():
             param.requires_grad = False
-            
-    def unfreeze(self):
-        for param in self.parameters():
+
+    @staticmethod
+    def unfreeze_parameters(module):
+        """Unfreeze all parameters of a module."""
+        for param in module.parameters():
             param.requires_grad = True
 
-    def isfrozen(self):
-        for param in self.parameters():
+    @staticmethod
+    def is_module_frozen(module):
+        """Check if all parameters in a module are frozen."""
+        for param in module.parameters():
             if param.requires_grad:
                 return False
         return True
 
-    @property
-    def device(self):
-        return next(self.parameters()).device
+    @staticmethod
+    def get_device(module):
+        """Get the device of the module."""
+        return next(module.parameters()).device
 
-    def to(self, device):
-        return super().to(device)
-    
-    @property
-    def dtype(self):
-        return next(self.parameters()).dtype
+    @staticmethod
+    def get_dtype(module):
+        """Get the dtype of the module."""
+        return next(module.parameters()).dtype
 
-    def to_dtype(self, dtype):
-        return super().to(dtype)
-    
-    @property
-    def parameter_count(self):
-        return sum(p.numel() for p in self.parameters())
+    @staticmethod
+    def get_parameter_count(module):
+        """Count the total number of parameters in a module."""
+        return sum(p.numel() for p in module.parameters())
 
+    @staticmethod
+    def get_trainable_parameter_count(module):
+        """Count the number of trainable parameters in a module."""
+        return sum(p.numel() for p in module.parameters() if p.requires_grad)
 
-    def save(self, path):
-        """Save model and configuration to the specified path using safetensors."""
+    @staticmethod
+    def save_model_and_config(model, path):
+        """Save model weights and configuration."""
         from safetensors.torch import save_file
         os.makedirs(path, exist_ok=True)
-        chk_path = os.path.join(path, 'weights.safetensors')
-        config_path = os.path.join(path, 'config.json')
-        
-        # Move state_dict to CPU and save with safetensors
-        cpu_state_dict = {k: v.cpu() for k, v in self.state_dict().items()}
-        save_file(cpu_state_dict, chk_path)
-        
-        # Save configuration as JSON
-        self.config.to_json(config_path)
-    
-    def load_from_safetensors(self, path):
-        """Load a model and its configuration from a safetensors checkpoint."""
-        from safetensors.torch import load_file
+        chk_path = os.path.join(path, "weights.safetensors")
+        config_path = os.path.join(path, "config.json")
+
+        # Save weights using safetensors
+        state_dict = {k: v.cpu() for k, v in model.state_dict().items()}
+        save_file(state_dict, chk_path)
+
+        # Save config as JSON
+        model.config.to_json(config_path)
+
+    @staticmethod
+    def load_model_weights_from_safetensors(model, path):
+        """Load model weights from safetensors."""
         if os.path.isdir(path):
-            path = os.path.join(path, 'weights.safetensors')
-        # Load state_dict using safetensors
+            path = os.path.join(path, "weights.safetensors")
+        from safetensors.torch import load_file
         state_dict = load_file(path)
-        self.load_state_dict(state_dict)
-        return self
+        model.load_state_dict(state_dict)
+
+    @staticmethod
+    def push_model_to_hub(model, model_id, token=None, temp_dir="./temp/", commit_message="Push model.", push_kwargs=None):
+        """Push model to Hugging Face Hub."""
+        if token is None:
+            token = os.environ.get("HUGGINGFACE_TOKEN")
+        if token is None:
+            raise ValueError("Token is required to push to the Hub.")
+        if push_kwargs is None:
+            push_kwargs = {}
+
+        path = os.path.join(temp_dir, model_id)
+        ModelUtils.save_model_and_config(model, path)
+
+        api = HfApi(token=token)
+        url = api.create_repo(repo_id=model_id, repo_type="model", exist_ok=True)
+        api.upload_folder(repo_id=url.repo_id, folder_path=path, commit_message=commit_message, repo_type="model", **push_kwargs)
+        shutil.rmtree(temp_dir)
+        logger.info(f"Model pushed to the Hub: {url}")
+        return url
+
+    @staticmethod
+    def load_model_from_hub(cls, model_id, token=None, device=None, config=None, dtype=None):
+        """Load a model from Hugging Face Hub."""
+        if token is None:
+            token = os.environ.get("HUGGINGFACE_TOKEN")
+        if token is None:
+            raise ValueError("Token is required to load from the Hub.")
+        api = HfApi(token=token)
+        path = api.snapshot_download(repo_id=model_id)
+        model = cls.from_pretrained(path, device=device, config=config, dtype=dtype)
+        return model
+
+
+class ModelBase(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    # Utility methods directly integrated
+    freeze = ModelUtils.freeze_parameters
+    unfreeze = ModelUtils.unfreeze_parameters
+    isfrozen = ModelUtils.is_module_frozen
+    get_device = ModelUtils.get_device
+    get_dtype = ModelUtils.get_dtype
+    get_parameter_count = ModelUtils.get_parameter_count
+    get_trainable_parameter_count = ModelUtils.get_trainable_parameter_count
+
+    device = property(ModelUtils.get_device)
+    dtype = property(ModelUtils.get_dtype)
+    parameter_count = property(ModelUtils.get_parameter_count)
+    trainable_parameter_count = property(ModelUtils.get_trainable_parameter_count)
+    
+    save = ModelUtils.save_model_and_config
+    load_from_safetensors = ModelUtils.load_model_weights_from_safetensors
+    push_to_hub = ModelUtils.push_model_to_hub
+    # load_from_hub = ModelUtils.load_model_from_hub
+
+    @classmethod
+    def load_from_hub(cls, model_id, token=None, device=None, config=None, dtype=None):
+        """Load a model from Hugging Face Hub."""
+        ModelUtils.load_model_from_hub(cls, model_id, token, device, config, dtype)
 
     @classmethod
     def from_pretrained(cls, path, device=None, config=None, dtype=None):
@@ -83,7 +150,7 @@ class ModelBase(nn.Module):
             state_dict = {k: v.to(dtype) for k, v in state_dict.items()}
         
         # Load configuration
-        config = config or Config.from_json(config_path)
+        config = config or ConfigBase.from_json(config_path)
         
         # Initialize the model
         model = cls(config)
@@ -100,9 +167,6 @@ class ModelBase(nn.Module):
     def validation_step(self, batch, batch_idx):
         raise NotImplementedError
     
-    def log(self,key, value):
-        wandb.log({key: value})
-    
     def get_trainable_state_dict(self):
         trainable_params = {
             name: param for name, param in self.named_parameters() if param.requires_grad
@@ -115,8 +179,8 @@ class ModelBase(nn.Module):
             if p.requires_grad:
                 yield p
     
-    def get_trainable_parameter_count(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    def log(self,key, value):
+        wandb.log({key: value})
 
     def get_optimizer(self,trainer):
         module = getattr(torch.optim, trainer.args.optimizer)
@@ -144,5 +208,4 @@ class ModelBase(nn.Module):
                 print(f"Invalid level: {level}. Skipping notification.")
                 return
 
-
-__all__ = ["ModelBase","ConfigBase","Trainer","TrainerArgs"]
+__all__ = ["ModelBase", "ConfigBase", "Trainer", "TrainerArgs", "ModelUtils"]
