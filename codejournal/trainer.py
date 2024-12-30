@@ -89,6 +89,7 @@ class Trainer:
         if self.args.slack_notify:
             self.notify(f"Training started!")
         self.infer_train_val_steps(train_dataset, val_dataset)
+        self.print_model_summary(model)
         train_dataloader, optimizer, scheduler, grad_scaler = self.train_setup(model, train_dataset, collate_fn)
         nepochs = self.args.max_epochs if not self.args.debug_mode else 1
         epoch = self.current_state['steps']//self.current_state['train_steps_per_epoch']
@@ -213,6 +214,27 @@ class Trainer:
                     self.load_checkpoint(model, path)
                     self.notify(f"Resuming from latest checkpoint: {path}")
         return train_dataloader, optimizer, scheduler, grad_scaler
+        
+    def print_model_summary(self,model):
+        data = []
+        for name, instance in model.named_children():
+            data.append({"Module":instance.__class__.__name__,
+                    "parameter_count(m)":instance.parameter_count/1e6,
+                    "trainable_parameter_count(m)":instance.trainable_parameter_count/1e6,
+                    "trainable": not instance.isfrozen()})
+            data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * instance.dtype.itemsize/1024/1024
+
+        data.append({
+            "Module": model.__class__.__name__ + " (Total)",
+            "parameter_count(m)": model.parameter_count/1e6,
+            "trainable_parameter_count(m)": model.trainable_parameter_count/1e6,
+            "trainable": not model.isfrozen()
+        })
+        data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * instance.dtype.itemsize/1024/1024
+
+        table = pd.DataFrame(data).round(2).to_markdown(index=False)
+        s = f"\n{'-'*10} Model Summary {'-'*10}\n{table}\n{'-'*35}"
+        logger.info(s)
     
     def infer_train_val_steps(self, train_dataset=None, val_dataset=None):
         if train_dataset is not None:

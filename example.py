@@ -14,9 +14,8 @@ class Config(ConfigBase):
 class ResNet(ModelBase):
     def __init__(self, config):
         super().__init__(config)
-        self.config = config
-        self.model = getattr(models, f'resnet{config.resnet}')(pretrained=config.pretrained)
-        self.model.fc = nn.Linear(self.model.fc.in_features, config.num_classes)
+        self.model = getattr(models, f'resnet{self.config.resnet}')(pretrained=self.config.pretrained)
+        self.model.fc = nn.Linear(self.model.fc.in_features, self.config.num_classes)
         
     def forward(self, x):
         x = x.repeat(1,3,1,1)
@@ -46,9 +45,6 @@ class ResNet(ModelBase):
         args = trainer.args # For configuring÷
         return super().get_scheduler(optimizer, trainer)
 
-
-config = Config()
-model = ResNet(config)
 
 transform=transforms.Compose([
         transforms.ToTensor(),
@@ -108,6 +104,11 @@ training_args = TrainerArgs(
     val_data_shuffle=False,
 )
 
+if __name__ == "__main__":
+    config = Config()
+    model = ResNet(config)
 
-trainer = Trainer(training_args)
-trainer.train(model, train_dataset, val_dataset)
+    trainer = Trainer(training_args)
+    trainer.train(model, train_dataset, val_dataset)
+
+__all__ = ["Config","ResNet","Trainer","TrainerArgs","train_dataset","val_dataset","training_args"]

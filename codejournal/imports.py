@@ -1,5 +1,6 @@
 import os
 import gc
+import cv2
 import sys
 import time
 import json

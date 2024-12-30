@@ -99,7 +99,9 @@ def convert_to_channel_first(tensor):
     ndim = tensor.ndim
     dims = list(range(ndim))
     batch, others, channels = dims[0], dims[1:-1], dims[-1]
-    return tensor.permute(batch, channels, *others)
+    tensor = tensor.permute(batch, channels, *others)
+    tensor = tensor.contiguous()
+    return tensor
 
 
 def convert_to_channel_last(tensor):
@@ -119,7 +121,9 @@ def convert_to_channel_last(tensor):
     ndim = tensor.ndim
     dims = list(range(ndim))
     batch, channels, others = dims[0], dims[1], dims[2:]
-    return tensor.permute(batch, *others, channels)
+    tensor = tensor.permute(batch, *others, channels)
+    tensor = tensor.contiguous()
+    return tensor
 
 
 def clear_gpu_cache():
@@ -139,4 +143,6 @@ __all__ = [ "simple_timer",
             "unzip_file", 
             "untar_file",
             "parallel_map",
+            "convert_to_channel_first",
+            "convert_to_channel_last",
             "clear_gpu_cache"]
