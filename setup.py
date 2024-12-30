@@ -6,7 +6,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name="codejournal",
-    version="0.1.2",
+    version="0.1.3",
     author="Siva Sankar S",
     author_email="sysrunai@gmail.com",
     description="A Python package code snips package for faster pytorch-AI development",

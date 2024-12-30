@@ -71,7 +71,7 @@ class ModelUtils:
         model.load_state_dict(state_dict)
 
     @staticmethod
-    def push_model_to_hub(model, model_id, token=None, temp_dir="./temp/", commit_message="Push model.", push_kwargs=None):
+    def push_model_to_hub(model, model_id, token=None, temp_dir="./temp/", private=True,commit_message="Push model.", push_kwargs=None):
         """Push model to Hugging Face Hub."""
         if token is None:
             token = os.environ.get("HUGGINGFACE_TOKEN")
@@ -84,7 +84,7 @@ class ModelUtils:
         ModelUtils.save_model_and_config(model, path)
 
         api = HfApi(token=token)
-        url = api.create_repo(repo_id=model_id, repo_type="model", exist_ok=True)
+        url = api.create_repo(repo_id=model_id, repo_type="model", exist_ok=True, private=private)
         api.upload_folder(repo_id=url.repo_id, folder_path=path, commit_message=commit_message, repo_type="model", **push_kwargs)
         shutil.rmtree(temp_dir)
         logger.info(f"Model pushed to the Hub: {url}")
@@ -128,9 +128,9 @@ class ModelBase(nn.Module):
     # load_from_hub = ModelUtils.load_model_from_hub
 
     @classmethod
-    def load_from_hub(cls, model_id, token=None, device=None, config=None, dtype=None):
+    def load_from_hub(cls, model_id, token=None, device=None, config=None, dtype=None,private=True):
         """Load a model from Hugging Face Hub."""
-        ModelUtils.load_model_from_hub(cls, model_id, token, device, config, dtype)
+        ModelUtils.load_model_from_hub(cls, model_id, token=token, device=device, config=config, dtype=dtype,private=private)
 
     @classmethod
     def from_pretrained(cls, path, device=None, config=None, dtype=None):
