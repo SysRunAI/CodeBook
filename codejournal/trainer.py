@@ -6,17 +6,7 @@ from dataclasses import dataclass, field
 import torch.optim as optim
 from torch.amp import GradScaler, autocast
 from typing import Union
-
-log_format = f'\n{"*"*25}\n%(asctime)s %(levelname)s:\n\n %(message)s\n{"*"*25}\n'
-logging.basicConfig(format=log_format, level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-file_handler = logging.FileHandler( "train.log")
-file_formatter = logging.Formatter(log_format)
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+from .loggers import train_logger as logger
 
 class TrainerArgs(ConfigBase):
     # Optimization settings

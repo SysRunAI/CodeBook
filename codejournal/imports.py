@@ -9,8 +9,8 @@ import wandb
 import joblib
 import shutil
 import logging
-# import random
-from Crypto.Random import random # pip install pycryptodome
+import random
+from Crypto.Random import random as crandom # pip install pycryptodome
 import warnings
 import numpy as np
 import pandas as pd
@@ -44,15 +44,7 @@ load_dotenv('./codebook/.env')
 # Video
 from moviepy import *  # latest version
 
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
+from .loggers import logger
 # Tests
 logger.info(f"CUDA available: {torch.cuda.is_available()}")
 logger.info(f"CUDA devices: {torch.cuda.device_count()}")
