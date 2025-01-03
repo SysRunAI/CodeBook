@@ -52,6 +52,7 @@ class TrainerArgs(ConfigBase):
     wandb_resume: bool = "allow"
     wandb_kwargs: dict = field(default_factory=dict)
     slack_notify: bool = False
+    
 
 
 
@@ -60,6 +61,7 @@ class Trainer:
         self.args = args
         self.logs = []
         self.current_state = {'steps':0,
+                              'epoch': 0,
                             'best_checkpoint':None,
                             'best_score':math.inf if self.args.checkpoint_metric_minimize else -math.inf,
                             "train_steps_per_epoch":None,
@@ -75,12 +77,13 @@ class Trainer:
                                 **self.args.wandb_kwargs)
         os.makedirs(self.args.results_dir, exist_ok=True)
         
-    def train(self, model, train_dataset, val_dataset=None, collate_fn=None):
+    def train(self, model, train_dataset, val_dataset=None, collate_fn=None,timeout=None):
         if self.args.slack_notify:
             self.notify(f"Training started!")
+        model.trainer_state = self.current_state # Pass reference to model
         self.infer_train_val_steps(train_dataset, val_dataset)
-        self.print_model_summary(model)
         train_dataloader, optimizer, scheduler, grad_scaler = self.train_setup(model, train_dataset, collate_fn)
+        self.print_model_summary(model)
         nepochs = self.args.max_epochs if not self.args.debug_mode else 1
         epoch = self.current_state['steps']//self.current_state['train_steps_per_epoch']
 
@@ -92,7 +95,7 @@ class Trainer:
                 desc=f"Training")
         
         model.to(device)
-        for epoch in range(epoch, nepochs):
+        for epoch in tqdm(range(epoch, nepochs),total=nepochs,desc="Training epochs...",leave=False):
             self.current_state['epoch'] = epoch
             model.train()
             self.notify(f"Epoch {epoch+1}/{nepochs} started!")
@@ -124,6 +127,7 @@ class Trainer:
 
                 if (batch_idx+1)%self.args.log_every_n_steps==0:
                     self.log_it(running_means,log_type="train", level="step")
+                    running_means = defaultdict(float) # reset it here!
                 self.current_state['steps'] += 1
                 pbar.update(1)
 
@@ -168,7 +172,7 @@ class Trainer:
         running_means = defaultdict(float)
         for batch_idx, batch in enumerate(dataloader):
             batch = batch_to(batch, device)
-            with torch.inference_mode():
+            with torch.no_grad():
                 losses = model.validation_step(batch, batch_idx)
             losses = {k: v.item() if isinstance(v, torch.Tensor) else v for k, v in losses.items()}
 
@@ -177,6 +181,7 @@ class Trainer:
             pbar.set_postfix_str(f"Loss: {running_means['loss']:.4f}")
             if (batch_idx+1)%self.args.log_every_n_steps==0:
                 self.log_it(running_means, log_type="val", level="step")
+                running_means = defaultdict(float) # reset it here!
 
             pbar.update(1)
 
@@ -190,6 +195,15 @@ class Trainer:
         train_dataloader = (SafeDataLoader if self.args.safe_dataloader else DataLoader)(train_dataset,
                      batch_size=self.args.batch_size, 
                      num_workers=self.args.num_workers, collate_fn=collate_fn,shuffle=True)
+                     
+        # Dummy call to inititalize Lazy Modules
+        batch = next(iter(train_dataloader))
+        device = self.infer_device()
+        batch = batch_to(batch, device)
+        model.to(device)
+        with torch.no_grad():
+            model.training_step(batch, -1)
+
         self.current_state['steps'] = (self.current_state['steps']//self.current_state['train_steps_per_epoch']) * self.current_state['train_steps_per_epoch']
         optimizer = model.get_optimizer(self)
         scheduler = model.get_scheduler(optimizer,self)
@@ -214,7 +228,9 @@ class Trainer:
                     "parameter_count(m)":ModelUtils.get_parameter_count(instance) / 1e6,
                     "trainable_parameter_count(m)":ModelUtils.get_trainable_parameter_count(instance)/1e6,
                     "trainable": not ModelUtils.is_module_frozen(instance)})
-            data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * ModelUtils.get_dtype(instance).itemsize/1024/1024
+            dtype = ModelUtils.get_dtype(instance)
+            itemsize = dtype.itemsize if dtype is not None else 0
+            data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * itemsize/1024/1024
 
         data.append({
             "Module": model.__class__.__name__ + " (Total)",
@@ -222,7 +238,9 @@ class Trainer:
             "trainable_parameter_count(m)": model.trainable_parameter_count/1e6,
             "trainable": not model.isfrozen()
         })
-        data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * model.get_dtype().itemsize/1024/1024
+        dtype = model.get_dtype()
+        itemsize = dtype.itemsize if dtype is not None else 0
+        data[-1]["Estimated Size (MB)"] = data[-1]["parameter_count(m)"] *1e6 * itemsize/1024/1024
 
         table = pd.DataFrame(data).round(2).to_markdown(index=False)
         s = f"\n{'-'*10} Model Summary {'-'*10}\n{table}\n{'-'*35}"

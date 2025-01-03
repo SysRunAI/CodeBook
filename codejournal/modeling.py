@@ -2,6 +2,7 @@ from .imports import *
 from .config import ConfigBase
 from .trainer import Trainer, TrainerArgs
 from huggingface_hub import HfApi
+from .slack import notify_info, notify_warn, notify_priority
     
 class ModelUtils:
     """Utility functions for model-related operations."""
@@ -34,7 +35,11 @@ class ModelUtils:
     @staticmethod
     def get_dtype(module):
         """Get the dtype of the module."""
-        return next(module.parameters()).dtype
+        try:
+            return next(module.parameters()).dtype
+        except StopIteration:
+            return None
+
 
     @staticmethod
     def get_parameter_count(module):
@@ -49,14 +54,15 @@ class ModelUtils:
     @staticmethod
     def save_model_and_config(model, path):
         """Save model weights and configuration."""
-        from safetensors.torch import save_file
+        from safetensors.torch import save_file, save_model
         os.makedirs(path, exist_ok=True)
         chk_path = os.path.join(path, "weights.safetensors")
         config_path = os.path.join(path, "config.json")
 
         # Save weights using safetensors
-        state_dict = {k: v.cpu() for k, v in model.state_dict().items()}
-        save_file(state_dict, chk_path)
+        # state_dict = {k: v.cpu() for k, v in model.state_dict().items()}
+        # save_file(state_dict, chk_path)
+        save_model(model, chk_path)
 
         # Save config as JSON
         model.config.to_json(config_path)
@@ -66,9 +72,10 @@ class ModelUtils:
         """Load model weights from safetensors."""
         if os.path.isdir(path):
             path = os.path.join(path, "weights.safetensors")
-        from safetensors.torch import load_file
-        state_dict = load_file(path)
-        model.load_state_dict(state_dict)
+        from safetensors.torch import load_file, load_model
+        # state_dict = load_file(path)
+        # model.load_state_dict(state_dict)
+        load_model(model, path)
 
     @staticmethod
     def push_model_to_hub(model, model_id, token=None, temp_dir="./temp/", private=True,commit_message="Push model.", push_kwargs=None):
@@ -135,7 +142,7 @@ class ModelBase(nn.Module):
     @classmethod
     def from_pretrained(cls, path, device=None, config=None, dtype=None):
         """Load a model and its configuration from a safetensors checkpoint."""
-        from safetensors.torch import load_file
+        from safetensors.torch import load_file, load_model
         assert os.path.isdir(path), f'Path {path} is not a directory'
         
         # File paths
@@ -143,18 +150,18 @@ class ModelBase(nn.Module):
         config_path = os.path.join(path, 'config.json')
         
         # Load state_dict using safetensors
-        state_dict = load_file(chk_path)
+        # state_dict = load_file(chk_path)
         
         # Optionally cast tensors to a specific dtype
         if dtype is not None:
-            state_dict = {k: v.to(dtype) for k, v in state_dict.items()}
+            model.to(dtype)
         
         # Load configuration
         config = config or ConfigBase.from_json(config_path)
         
         # Initialize the model
         model = cls(config)
-        model.load_state_dict(state_dict)
+        load_model(model, chk_path)
         
         # Move the model to the specified device, if any
         if device is not None:
